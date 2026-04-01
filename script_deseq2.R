@@ -229,3 +229,50 @@ pheatmap(mat,
          show_rownames = FALSE,
          cluster_cols = TRUE,
          cluster_rows = TRUE)
+
+#Enriquecimiento funcional
+BiocManager::install(c("clusterProfiler", "org.Hs.eg.db", "enrichplot"))
+
+#Preparar los genes
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(enrichplot)
+
+# Quitar NA
+res <- res_dox[!is.na(res_dox$padj), ]
+
+# Filtrar significativos
+res_sig <- res[res$padj < 0.05, ]
+
+# Extraer nombres de genes
+genes <- rownames(res_sig)
+
+#Convertir a Entrez
+genes_entrez <- bitr(genes,
+                     fromType = "SYMBOL",
+                     toType = "ENTREZID",
+                     OrgDb = org.Hs.eg.db)
+
+# GO plot
+p_go <- dotplot(ego, showCategory = 20) +
+  ggtitle("GO enrichment (Biological Process)") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 10)
+  ) +
+  scale_color_gradient(low = "blue", high = "red")
+
+# KEGG plot
+p_kegg <- dotplot(ekegg, showCategory = 20) +
+  ggtitle("KEGG pathway enrichment") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 10)
+  ) +
+  scale_color_gradient(low = "blue", high = "red")
+
+# Mostrar
+p_go
+p_kegg
