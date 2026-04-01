@@ -1,0 +1,11 @@
+PASS	Basic Statistics	reverse.gz
+PASS	Per base sequence quality	reverse.gz
+FAIL	Per tile sequence quality	reverse.gz
+PASS	Per sequence quality scores	reverse.gz
+WARN	Per base sequence content	reverse.gz
+WARN	Per sequence GC content	reverse.gz
+PASS	Per base N content	reverse.gz
+PASS	Sequence Length Distribution	reverse.gz
+WARN	Sequence Duplication Levels	reverse.gz
+WARN	Overrepresented sequences	reverse.gz
+PASS	Adapter Content	reverse.gz

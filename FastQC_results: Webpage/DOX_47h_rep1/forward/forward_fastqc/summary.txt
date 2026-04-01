@@ -1,0 +1,11 @@
+PASS	Basic Statistics	forward.gz
+PASS	Per base sequence quality	forward.gz
+FAIL	Per tile sequence quality	forward.gz
+PASS	Per sequence quality scores	forward.gz
+FAIL	Per base sequence content	forward.gz
+PASS	Per sequence GC content	forward.gz
+PASS	Per base N content	forward.gz
+PASS	Sequence Length Distribution	forward.gz
+FAIL	Sequence Duplication Levels	forward.gz
+PASS	Overrepresented sequences	forward.gz
+PASS	Adapter Content	forward.gz
