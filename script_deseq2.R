@@ -237,6 +237,8 @@ BiocManager::install(c("clusterProfiler", "org.Hs.eg.db", "enrichplot"))
 library(clusterProfiler)
 library(org.Hs.eg.db)
 library(enrichplot)
+library(msigdbr)  
+
 
 # Quitar NA
 res <- res_dox[!is.na(res_dox$padj), ]
@@ -276,3 +278,177 @@ p_kegg <- dotplot(ekegg, showCategory = 20) +
 # Mostrar
 p_go
 p_kegg
+
+#Enriquecimiento GSEA
+
+preparar_gsea <- function(res, nombre) {
+  
+  # Convertir resultados a data.frame
+  res_df <- as.data.frame(res)
+  
+  # Eliminar NAs en padj
+  res_df <- res_df[!is.na(res_df$padj), ]
+  
+  # Ordenar por log2FoldChange de mayor a menor
+  # GSEA necesita genes ordenados por estadístico (usamos log2FC)
+  gene_list <- res_df$log2FoldChange
+  names(gene_list) <- rownames(res_df)
+  
+  # Ordenar de mayor a menor (genes más sobreexpresados al principio)
+  gene_list <- sort(gene_list, decreasing = TRUE)
+  
+  return(list(gene_list = gene_list, res_df = res_df))
+}
+
+
+ejecutar_gsea <- function(gene_list, nombre_contraste, ontologias = c("GO", "KEGG")) {
+  
+  cat("\n========================================\n")
+  cat("GSEA para:", nombre_contraste, "\n")
+  cat("========================================\n")
+  
+  resultados <- list()
+  
+  # GSEA con GO (Gene Ontology - Biological Process)
+  
+  if ("GO" %in% ontologias) {
+    cat("\n>>> Ejecutando GSEA con GO (Biological Process)...\n")
+    
+    gsea_go <- gseGO(
+      geneList = gene_list,
+      OrgDb = org.Hs.eg.db,
+      ont = "BP",           # Biological Process
+      keyType = "SYMBOL",
+      minGSSize = 10,
+      maxGSSize = 500,
+      pvalueCutoff = 0.05,
+      pAdjustMethod = "BH",
+      verbose = FALSE
+    )
+    
+    if (!is.null(gsea_go) && nrow(gsea_go) > 0) {
+      resultados$GO <- gsea_go
+      cat("  -> Términos GO enriquecidos:", nrow(gsea_go), "\n")
+    } else {
+      cat("  -> No se encontraron términos GO significativos\n")
+    }
+  }
+  
+  
+  # GSEA con KEGG
+  if ("KEGG" %in% ontologias) {
+    cat("\n>>> Ejecutando GSEA con KEGG...\n")
+    
+    # Convertir símbolos a ENTREZID para KEGG
+    gene_list_entrez <- gene_list
+    
+    # Bitr para convertir nombres
+    genes_symbol <- names(gene_list_entrez)
+    genes_entrez_map <- bitr(genes_symbol, 
+                             fromType = "SYMBOL", 
+                             toType = "ENTREZID", 
+                             OrgDb = org.Hs.eg.db)
+    
+    # Filtrar y mantener solo genes con conversión exitosa
+    gene_list_entrez <- gene_list_entrez[names(gene_list_entrez) %in% genes_entrez_map$SYMBOL]
+    names(gene_list_entrez) <- genes_entrez_map$ENTREZID[match(names(gene_list_entrez), 
+                                                               genes_entrez_map$SYMBOL)]
+    
+    gsea_kegg <- gseKEGG(
+      geneList = gene_list_entrez,
+      organism = "hsa",
+      minGSSize = 10,
+      maxGSSize = 500,
+      pvalueCutoff = 0.05,
+      pAdjustMethod = "BH",
+      verbose = FALSE
+    )
+    
+    if (!is.null(gsea_kegg) && nrow(gsea_kegg) > 0) {
+      resultados$KEGG <- gsea_kegg
+      cat("  -> Rutas KEGG enriquecidas:", nrow(gsea_kegg), "\n")
+    } else {
+      cat("  -> No se encontraron rutas KEGG significativas\n")
+    }
+  }
+  
+  
+  return(resultados)
+}
+
+
+graficar_gsea <- function(resultados, nombre_contraste) {
+  
+  if (is.null(resultados) || length(resultados) == 0) {
+    cat("No hay resultados GSEA para graficar\n")
+    return()
+  }
+  
+  # Graficar GO results
+  if (!is.null(resultados$GO) && nrow(resultados$GO) > 0) {
+    p_go_ridge <- ridgeplot(resultados$GO, showCategory = 20) +
+      ggtitle(paste("GSEA - GO Biological Process:", nombre_contraste)) +
+      theme_classic() +
+      theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+    
+    print(p_go_ridge)
+    ggsave(paste0("GSEA_GO_ridgeplot_", nombre_contraste, ".png"), 
+           p_go_ridge, width = 10, height = 8, dpi = 300)
+    
+    # Dotplot para GO
+    p_go_dot <- dotplot(resultados$GO, showCategory = 15) +
+      ggtitle(paste("GSEA - GO:", nombre_contraste)) +
+      theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+    
+    print(p_go_dot)
+    ggsave(paste0("GSEA_GO_dotplot_", nombre_contraste, ".png"), 
+           p_go_dot, width = 10, height = 8, dpi = 300)
+  }
+  
+  # Graficar KEGG results
+  if (!is.null(resultados$KEGG) && nrow(resultados$KEGG) > 0) {
+    p_kegg_ridge <- ridgeplot(resultados$KEGG, showCategory = 20) +
+      ggtitle(paste("GSEA - KEGG Pathways:", nombre_contraste)) +
+      theme_classic() +
+      theme(plot.title = element_text(hjust = 0.5, face = "bold"))
+    
+    print(p_kegg_ridge)
+    ggsave(paste0("GSEA_KEGG_ridgeplot_", nombre_contraste, ".png"), 
+           p_kegg_ridge, width = 10, height = 8, dpi = 300)
+  }
+  
+}
+
+
+# Preparar datos
+gsea_dox <- preparar_gsea(res_dox, "DOX_vs_CTR")
+gsea_btz <- preparar_gsea(res_btz, "BTZ_vs_CTR")
+gsea_tr <- preparar_gsea(res_tr, "BTZ_vs_DOX")
+
+# Ejecutar GSEA para cada contraste
+resultados_gsea_dox <- ejecutar_gsea(gsea_dox$gene_list, "DOX_vs_CTR", ontologias = c("GO", "KEGG"))
+resultados_gsea_btz <- ejecutar_gsea(gsea_btz$gene_list, "BTZ_vs_CTR", ontologias = c("GO", "KEGG"))
+resultados_gsea_tr <- ejecutar_gsea(gsea_tr$gene_list, "BTZ_vs_DOX", ontologias = c("GO", "KEGG"))
+
+# Graficar resultados
+graficar_gsea(resultados_gsea_dox, "DOX_vs_CTR")
+graficar_gsea(resultados_gsea_btz, "BTZ_vs_CTR")
+graficar_gsea(resultados_gsea_tr, "BTZ_vs_DOX")
+
+
+guardar_resultados_gsea <- function(resultados, nombre_contraste) {
+  if (!is.null(resultados$GO)) {
+    write.csv(as.data.frame(resultados$GO), 
+              paste0("GSEA_GO_", nombre_contraste, ".csv"))
+  }
+  if (!is.null(resultados$KEGG)) {
+    write.csv(as.data.frame(resultados$KEGG), 
+              paste0("GSEA_KEGG_", nombre_contraste, ".csv"))
+  }
+}
+
+guardar_resultados_gsea(resultados_gsea_dox, "DOX_vs_CTR")
+guardar_resultados_gsea(resultados_gsea_btz, "BTZ_vs_CTR")
+guardar_resultados_gsea(resultados_gsea_tr, "BTZ_vs_DOX")
+
+
