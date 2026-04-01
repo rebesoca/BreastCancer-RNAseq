@@ -203,3 +203,29 @@ ggplot(pca_data, aes(x = PC1, y = PC2, color = condition, shape = time)) +
 
 ggsave("PCA_condicion_tiempo.png", width = 8, height = 6, dpi = 300)
 
+#Crear heatmap
+library(pheatmap)
+
+# Transformación (importante)
+vsd <- vst(dds, blind = FALSE)
+
+# Seleccionar genes significativos (ejemplo DOX vs CTR)
+res_sig <- res_dox[which(res_dox$padj < 0.05), ]
+
+# Ordenar por significancia
+top_genes <- rownames(res_sig[order(res_sig$padj), ])
+
+# Quedarte con los top 50
+top_genes <- top_genes[1:50]
+
+# Extraer matriz de expresión
+mat <- assay(vsd)[top_genes, ]
+
+# Escalar por gen (muy importante para visualizar)
+mat <- t(scale(t(mat)))
+
+pheatmap(mat,
+         annotation_col = as.data.frame(colData(dds)[, "condition", drop=FALSE]),
+         show_rownames = FALSE,
+         cluster_cols = TRUE,
+         cluster_rows = TRUE)
